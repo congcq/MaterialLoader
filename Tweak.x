@@ -8,6 +8,7 @@
 
 static NSArray* getActiveResourcePacks(void);
 static NSString* findFileInPack(NSString* packId, NSString* subpack, NSString* fileName);
+static NSDictionary *packRootCache = nil;
 
 // data path
 static NSString* getResourcePacksPath(void) {
@@ -45,29 +46,53 @@ static NSArray* getActiveResourcePacks(void) {
     return [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
 }
 
-// find pack by uuid get in global_resource_packs.json
-static NSString* findPackRoot(NSString* packId) {
+static void buildPackRootCache(void) {
     NSString *resPacks = getResourcePacksPath();
     NSFileManager *fm = [NSFileManager defaultManager];
+    NSMutableDictionary *cache = [NSMutableDictionary dictionary];
     
-    for (NSString *folder in [fm contentsOfDirectoryAtPath:resPacks error:nil]) {
-        NSString *manifestPath = [[resPacks stringByAppendingPathComponent:folder] stringByAppendingPathComponent:@"manifest.json"];
+    NSArray *rootFolders = [fm contentsOfDirectoryAtPath:resPacks error:nil];
+    NSMutableArray *allCandidates = [rootFolders mutableCopy];
+    
+    for (NSString *folder in rootFolders) {
+        NSString *folderPath = [resPacks stringByAppendingPathComponent:folder];
+        BOOL isDir = NO;
+        if ([fm fileExistsAtPath:folderPath isDirectory:&isDir] && isDir) {
+            for (NSString *sub in [fm contentsOfDirectoryAtPath:folderPath error:nil]) {
+                NSString *subPath = [folderPath stringByAppendingPathComponent:sub];
+                if ([fm fileExistsAtPath:subPath isDirectory:&isDir] && isDir) {
+                    [allCandidates addObject:[NSString stringWithFormat:@"%@/%@", folder, sub]];
+                }
+            }
+        }
+    }
+    
+    // map uuid to path
+    for (NSString *candidate in allCandidates) {
+        NSString *manifestPath = [[resPacks stringByAppendingPathComponent:candidate] stringByAppendingPathComponent:@"manifest.json"];
         NSData *data = [NSData dataWithContentsOfFile:manifestPath];
         if (!data) continue;
         
         NSDictionary *manifest = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-        NSString *headerUuid = manifest[@"header"][@"uuid"];
+        if (!manifest) continue;
         
-        if ([headerUuid isEqualToString:packId]) {
-            return [resPacks stringByAppendingPathComponent:folder];
+        NSString *uuid = manifest[@"header"][@"uuid"];
+        if (uuid) {
+            cache[uuid] = [resPacks stringByAppendingPathComponent:candidate];
         }
         for (NSDictionary *mod in manifest[@"modules"]) {
-            if ([mod[@"uuid"] isEqualToString:packId]) {
-                return [resPacks stringByAppendingPathComponent:folder];
+            if (mod[@"uuid"]) {
+                cache[mod[@"uuid"]] = [resPacks stringByAppendingPathComponent:candidate];
             }
         }
     }
-    return nil;
+    
+    packRootCache = cache;
+    NSLog(@"[MaterialLoader] Cache built: %lu packs", (unsigned long)cache.count);
+}
+
+static NSString* findPackRoot(NSString* packId) {
+    return packRootCache[packId];
 }
 
 // find .material.bin in pack
@@ -146,6 +171,8 @@ static void showDialog(NSString* title, NSString* message) {
 }
 
 %ctor {
+    buildPackRootCache();
+
     struct rebinding fopen_rebinding = {"fopen", hook_fopen, (void *)&orig_fopen};
     rebind_symbols(&fopen_rebinding, 1);
     
