@@ -1,4 +1,4 @@
-> [!Lưu ý]
+> [!Note]
 > Hiện tại dự án này còn mới và tiềm ẩn lỗi vặt. Nếu gặp bất cứ lỗi nào hãy báo ngay với chúng tôi, chúng tôi sẽ fix nếu có thể.
 
 # Material Loader
