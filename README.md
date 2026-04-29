@@ -1,21 +1,25 @@
 > [!Note]
-> Hiện tại dự án còn mới và tiềm ẩn lỗi vặt. Nếu gặp bất cứ lỗi nào hãy báo ngay với chúng tôi, chúng tôi sẽ fix nếu có thể.
-> Bạn cũng có thể đóng góp vào dự án này.
+> The current project is new and may contain minor bugs. If you encounter any issues, please report them to us immediately, and we will fix them if possible.
+> You can also contribute to this project.
+
+Looking for [Vietnamese](README_VN.md)?
 
 # Material Loader
 
-**Material Loader** là một tinh chỉnh jailbreak cho iOS giúp cho Minecraft: Bedrock edition load những file `material.bin` có trong resource pack, hoạt động tương tự như MaterialBinLoader hay Draco trên Android.
+**Material Loader** is a jailbreak tweak for iOS that allows Minecraft: Bedrock Edition to load `material.bin` files from resource packs, functioning similarly to MaterialBinLoader or Draco on Android.
 
-## Cách tinh chỉnh này hoạt động
+The tweak works with most Minecraft versions using the RenderDragon engine.
 
-Tinh chỉnh này hook hàm `fopen()` khi Minecraft gọi hàm này từ `libsystem_c.dylib` để chuyển hướng game sang load những file `material.bin` bên trong pack đã được active trong `Global Resource Packs` thay vì load những file gốc tương ứng.
+## How This Tweak Works
 
-## Cách sử dụng
+This tweak hooks the `fopen()` function when Minecraft calls it from `libsystem_c.dylib` to redirect the game to load `material.bin` files from active packs in `Global Resource Packs` instead of loading the corresponding original files.
 
-Với thiết bị jailbreak, hãy tải tinh chỉnh này ở [đây](https://github.com/CyberGangzTeam/MaterialLoader/releases) và cài đặt nó thông qua sileo/zebra.
+## How to Use
 
-Với thiết bị không jailbreak (Jailed), hãy lấy file .dylib bên trong tinh chỉnh và inject trực tiếp nó vào file thực thi chính của ipa thông qua một số ứng dụng sideload như Esign, Ksign, Feather,etc... và cài đặt ipa đã được inject qua việc ký chứng chỉ hoặc cài qua TrollStore (nếu có).
+- For jailbroken devices, download this tweak [here](https://github.com/congcq/MaterialLoader/releases) and install it via Sileo/Zebra.
 
-## Third party
+- For non-jailbroken (Jailed) devices, extract the .dylib file from inside the tweak and inject it directly into the main executable of the IPA file using sideloading apps like Esign, Ksign, Feather, etc. Then, install the injected IPA by signing with a certificate or through TrollStore (if available).
 
-- [fishhook](https://github.com/jevinskie/fishhook): [BSD-3 License](https://github.com/facebook/fishhook/blob/main/LICENSE)
+## Third Party
+
+- fishhook: BSD-3 License
