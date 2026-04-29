@@ -22,4 +22,4 @@ This tweak hooks the `fopen()` function when Minecraft calls it from `libsystem_
 
 ## Third Party
 
-- fishhook: BSD-3 License
+- [fishhook](https://github.com/jevinskie/fishhook): [BSD-3 License](https://github.com/facebook/fishhook/blob/main/LICENSE)

@@ -14,7 +14,7 @@ Tinh chỉnh này hook hàm `fopen()` khi Minecraft gọi hàm này từ `libsys
 
 ## Cách sử dụng
 
-- Với thiết bị jailbreak, hãy tải tinh chỉnh này [ở đây](https://github.com/CyberGangzTeam/MaterialLoader/releases) và cài đặt nó thông qua sileo/zebra.
+- Với thiết bị jailbreak, hãy tải tinh chỉnh này [ở đây](https://github.com/congcq/MaterialLoader/releases) và cài đặt nó thông qua sileo/zebra.
 
 - Với thiết bị không jailbreak (Jailed), hãy lấy file .dylib bên trong tinh chỉnh và inject trực tiếp nó vào file thực thi chính của ipa thông qua một số ứng dụng sideload như Esign, Ksign, Feather,etc... và cài đặt ipa đã được inject qua việc ký chứng chỉ hoặc cài qua TrollStore (nếu có).
 
