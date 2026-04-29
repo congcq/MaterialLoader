@@ -23,7 +23,7 @@ FILE* hook_fopen(const char *path, const char *mode) {
         NSString *nsPath = [NSString stringWithUTF8String:path];
         
         // load material.bin in pack
-        if ([nsPath hasSuffix:@".material.bin"] && [nsPath containsString:@"renderer/materials"]) {
+        if ([nsPath hasSuffix:@".material.bin"] && [nsPath containsString:@"renderer/materials"] && [nsPath containsString:@"minecraftpe.app"]) {
             NSString *fileName = [nsPath lastPathComponent];
             NSString *customFile = findFileInPack(nil, nil, fileName);
             if (customFile) {
@@ -92,9 +92,10 @@ static void buildPackRootCache(void) {
 }
 
 static NSString* findPackRoot(NSString* packId) {
-    NSString *cached = packRootCache[packID];
+    NSString *cached = packRootCache[packId];
     if (cached) return cached;
 
+    NSLog(@"[MaterialLoader] Cache miss for %@, rebuilding...", packId);
     buildPackRootCache();
 
     return packRootCache[packId];
