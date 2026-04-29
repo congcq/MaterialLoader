@@ -92,6 +92,11 @@ static void buildPackRootCache(void) {
 }
 
 static NSString* findPackRoot(NSString* packId) {
+    NSString *cached = packRootCache[packID];
+    if (cached) return cached;
+
+    buildPackRootCache();
+
     return packRootCache[packId];
 }
 
