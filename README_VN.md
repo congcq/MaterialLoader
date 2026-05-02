@@ -2,9 +2,9 @@
 > Hiện tại dự án còn mới và tiềm ẩn lỗi vặt. Nếu gặp bất cứ lỗi nào hãy báo ngay với chúng tôi, chúng tôi sẽ fix nếu có thể.
 > Bạn cũng có thể đóng góp vào dự án này.
 
-# Material Loader
+# Hynis Patcher
 
-**Material Loader** là một tinh chỉnh jailbreak cho iOS giúp cho Minecraft: Bedrock edition load những file `material.bin` có trong resource pack, hoạt động tương tự như MaterialBinLoader hay Draco trên Android.
+**Hynis Patcher** là một tinh chỉnh jailbreak cho iOS giúp cho Minecraft: Bedrock edition load những file `material.bin` có trong resource pack, hoạt động tương tự như MaterialBinLoader hay Draco trên Android.
 
 Tinh chỉnh hoạt động với hầu hết phiên bản Minecraft sử dụng RenderDragon engine.
 
