@@ -191,7 +191,7 @@ static void showDialog(NSString* title, NSString* message) {
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.0 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
         NSString *title = @"Material Loader";
-        NSString *desc = [NSString stringWithFormat:@"Version: %s\nDeveloper: congcq", VERSION];
+        NSString *desc = [NSString stringWithFormat:@"Version: %s\nDeveloper: congcq\nNote: shader must be activated in global resource to work", VERSION];
         showDialog(title, desc);
     });
 }
