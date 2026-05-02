@@ -1,8 +1,8 @@
-Package: com.congcq.matloader
-Name: MaterialLoader
+Package: com.congcq.hynispatcher
+Name: HynisPatcher
 Version: 1.2
 Architecture: iphoneos-arm
-Description: An awesome MobileSubstrate tweak!
+Description: MCBE patched tweak
 Maintainer: congcq
 Author: congcq
 Section: Tweaks
