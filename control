@@ -1,6 +1,6 @@
 Package: com.congcq.hynispatcher
 Name: HynisPatcher
-Version: 1.2
+Version: 1.3
 Architecture: iphoneos-arm
 Description: MCBE patched tweak
 Maintainer: congcq

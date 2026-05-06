@@ -5,7 +5,7 @@
 #import "fishhook.h"
 #import "ZipHandler.h"
 
-#define VERSION "1.2"
+#define VERSION "1.3"
 
 static NSArray* getActiveResourcePacks(void);
 static NSString* findFileInPack(NSString* packId, NSString* subpack, NSString* relativePath);
