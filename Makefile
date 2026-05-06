@@ -2,9 +2,9 @@ TARGET := iphone:clang:latest:14.0
 
 include $(THEOS)/makefiles/common.mk
 
-TWEAK_NAME = HynisPatcher
+TWEAK_NAME = libHynisPatcher
 
-HynisPatcher_FILES = Tweak.x fishhook.c
-HynisPatcher_CFLAGS = -fobjc-arc
+libHynisPatcher_FILES = Tweak.x fishhook.c ZipHandler.m
+libHynisPatcher_CFLAGS = -fobjc-arc
 
 include $(THEOS_MAKE_PATH)/tweak.mk

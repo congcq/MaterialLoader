@@ -3,11 +3,12 @@
 #import <UIKit/UIKit.h>
 
 #import "fishhook.h"
+#import "ZipHandler.h"
 
 #define VERSION "1.2"
 
 static NSArray* getActiveResourcePacks(void);
-static NSString* findFileInPack(NSString* packId, NSString* subpack, NSString* fileName);
+static NSString* findFileInPack(NSString* packId, NSString* subpack, NSString* relativePath);
 static NSDictionary *packRootCache = nil;
 
 // data path
@@ -16,8 +17,9 @@ static NSString* getResourcePacksPath(void) {
     return [docPath stringByAppendingPathComponent:@"games/com.mojang/resource_packs"];
 }
 
-// hook fopen
-FILE* (*orig_fopen)(const char *path, const char *mode);
+// fopen hook
+static FILE* (*orig_fopen)(const char *path, const char *mode);
+
 FILE* hook_fopen(const char *path, const char *mode) {
     if (path != NULL) {
         NSString *nsPath = [NSString stringWithUTF8String:path];
@@ -55,39 +57,59 @@ static void buildPackRootCache(void) {
     NSFileManager *fm = [NSFileManager defaultManager];
     NSMutableDictionary *cache = [NSMutableDictionary dictionary];
     
-    NSArray *rootFolders = [fm contentsOfDirectoryAtPath:resPacks error:nil];
-    NSMutableArray *allCandidates = [rootFolders mutableCopy];
+    NSArray *rootContents = [fm contentsOfDirectoryAtPath:resPacks error:nil];
+    if (!rootContents) {
+        packRootCache = cache;
+        return;
+    }
     
-    for (NSString *folder in rootFolders) {
-        NSString *folderPath = [resPacks stringByAppendingPathComponent:folder];
+    NSMutableArray *candidates = [NSMutableArray array];
+    
+    for (NSString *item in rootContents) {
+        NSString *itemPath = [resPacks stringByAppendingPathComponent:item];
         BOOL isDir = NO;
-        if ([fm fileExistsAtPath:folderPath isDirectory:&isDir] && isDir) {
-            for (NSString *sub in [fm contentsOfDirectoryAtPath:folderPath error:nil]) {
-                NSString *subPath = [folderPath stringByAppendingPathComponent:sub];
+        [fm fileExistsAtPath:itemPath isDirectory:&isDir];
+        
+        if (isDir) {
+            [candidates addObject:item];
+            for (NSString *sub in [fm contentsOfDirectoryAtPath:itemPath error:nil]) {
+                NSString *subPath = [itemPath stringByAppendingPathComponent:sub];
                 if ([fm fileExistsAtPath:subPath isDirectory:&isDir] && isDir) {
-                    [allCandidates addObject:[NSString stringWithFormat:@"%@/%@", folder, sub]];
+                    [candidates addObject:[NSString stringWithFormat:@"%@/%@", item, sub]];
                 }
+            }
+        } else {
+            if (isArchivePack(itemPath)) {
+                [candidates addObject:item];
             }
         }
     }
     
-    // map uuid to path
-    for (NSString *candidate in allCandidates) {
-        NSString *manifestPath = [[resPacks stringByAppendingPathComponent:candidate] stringByAppendingPathComponent:@"manifest.json"];
-        NSData *data = [NSData dataWithContentsOfFile:manifestPath];
-        if (!data) continue;
+    for (NSString *candidate in candidates) {
+        NSString *fullPath = [resPacks stringByAppendingPathComponent:candidate];
+        NSDictionary *manifest = nil;
         
-        NSDictionary *manifest = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+        if (isArchivePack(fullPath)) {
+            NSData *manifestData = readFileFromZip(fullPath, @"manifest.json");
+            if (manifestData) {
+                manifest = [NSJSONSerialization JSONObjectWithData:manifestData options:0 error:nil];
+            }
+        } else {
+            NSString *manifestPath = [fullPath stringByAppendingPathComponent:@"manifest.json"];
+            NSData *data = [NSData dataWithContentsOfFile:manifestPath];
+            if (data) {
+                manifest = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            }
+        }
+        
         if (!manifest) continue;
         
         NSString *uuid = manifest[@"header"][@"uuid"];
-        if (uuid) {
-            cache[uuid] = [resPacks stringByAppendingPathComponent:candidate];
-        }
+        if (uuid) cache[uuid] = fullPath;
+        
         for (NSDictionary *mod in manifest[@"modules"]) {
-            if (mod[@"uuid"]) {
-                cache[mod[@"uuid"]] = [resPacks stringByAppendingPathComponent:candidate];
-            }
+            NSString *modUuid = mod[@"uuid"];
+            if (modUuid) cache[modUuid] = fullPath;
         }
     }
     
@@ -97,13 +119,13 @@ static void buildPackRootCache(void) {
 
 static NSString* findPackRoot(NSString* packId) {
     NSString *cached = packRootCache[packId];
-
+    
     if (!cached) {
         NSLog(@"[HynisPatcher] Cache miss for %@, rebuilding...", packId);
         buildPackRootCache();
         cached = packRootCache[packId];
     }
-
+    
     return cached;
 }
 
@@ -122,27 +144,41 @@ static NSString* findFileInPack(NSString* packId, NSString* subpack, NSString* r
         NSString *packRoot = findPackRoot(pid);
         if (!packRoot) continue;
         
-        // subpacks
-        if ([sp isEqualToString:@"default"]) {
-            // default subpack: we find subpacks/default/renderer first. if it does not exist, fallback to renderer folder
-            NSString *defaultPath = [[packRoot stringByAppendingPathComponent:@"subpacks/default"] stringByAppendingPathComponent:relativePath];
-            if ([fm fileExistsAtPath:defaultPath]) {
-                return defaultPath;
+        // archive pack (.zip/.mcpack)
+        if (isArchivePack(packRoot)) {
+            if (![sp isEqualToString:@"default"]) {
+                NSString *subpackRelative = [NSString stringWithFormat:@"subpacks/%@/%@", sp, relativePath];
+                NSString *tempFile = extractFileFromZip(packRoot, subpackRelative);
+                if (tempFile) return tempFile;
             }
-        } else {
-            // another subpack
-            NSString *subpackPath = [[packRoot stringByAppendingPathComponent:[NSString stringWithFormat:@"subpacks/%@", sp]] stringByAppendingPathComponent:relativePath];
-            if ([fm fileExistsAtPath:subpackPath]) {
-                return subpackPath;
+
+            if ([sp isEqualToString:@"default"]) {
+                NSString *defaultRelative = [NSString stringWithFormat:@"subpacks/default/%@", relativePath];
+                NSString *tempFile = extractFileFromZip(packRoot, defaultRelative);
+                if (tempFile) return tempFile;
             }
+
+            NSString *tempFile = extractFileFromZip(packRoot, relativePath);
+            if (tempFile) return tempFile;
+
+            continue;
         }
         
-
-        NSString *rootPath = [packRoot stringByAppendingPathComponent:relativePath];
-        if ([fm fileExistsAtPath:rootPath]) {
-            return rootPath;
+        // directory pack
+        if ([sp isEqualToString:@"default"]) {
+            NSString *defaultPath = [[packRoot stringByAppendingPathComponent:@"subpacks/default"]
+                                      stringByAppendingPathComponent:relativePath];
+            if ([fm fileExistsAtPath:defaultPath]) return defaultPath;
+        } else {
+            NSString *subpackPath = [[packRoot stringByAppendingPathComponent:[NSString stringWithFormat:@"subpacks/%@", sp]]
+                                      stringByAppendingPathComponent:relativePath];
+            if ([fm fileExistsAtPath:subpackPath]) return subpackPath;
         }
+        
+        NSString *rootPath = [packRoot stringByAppendingPathComponent:relativePath];
+        if ([fm fileExistsAtPath:rootPath]) return rootPath;
     }
+    
     return nil;
 }
 
@@ -169,6 +205,8 @@ static void showDialog(NSString* title, NSString* message) {
         }
     }
     
+    if (!gameWindow) return;
+    
     UIViewController *rootVC = gameWindow.rootViewController;
     while (rootVC.presentedViewController) {
         rootVC = rootVC.presentedViewController;
@@ -179,7 +217,7 @@ static void showDialog(NSString* title, NSString* message) {
 
 %ctor {
     buildPackRootCache();
-
+    
     struct rebinding fopen_rebinding = {"fopen", hook_fopen, (void *)&orig_fopen};
     rebind_symbols(&fopen_rebinding, 1);
     
