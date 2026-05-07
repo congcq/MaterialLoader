@@ -17,9 +17,19 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = libhynisloader
 
+# Pull Name/Version/Author from `control` so the on-screen banner stays in sync
+# with package metadata. awk strips the "Field: " prefix; trailing CR (if any)
+# is removed for safety on cross-platform checkouts.
+HL_NAME    := $(shell awk -F': *' '/^Name:/    {sub(/\r$$/,"",$$2); print $$2}' control)
+HL_VERSION := $(shell awk -F': *' '/^Version:/ {sub(/\r$$/,"",$$2); print $$2}' control)
+HL_AUTHOR  := $(shell awk -F': *' '/^Author:/  {sub(/\r$$/,"",$$2); print $$2}' control)
+
 libhynisloader_FILES      = Tweak.x fishhook.c ZipHandler.m
 libhynisloader_FRAMEWORKS = Foundation UIKit
-libhynisloader_CFLAGS     = -fobjc-arc
+libhynisloader_CFLAGS     = -fobjc-arc \
+    -DHL_NAME='"$(HL_NAME)"' \
+    -DHL_VERSION='"$(HL_VERSION)"' \
+    -DHL_AUTHOR='"$(HL_AUTHOR)"'
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 

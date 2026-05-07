@@ -5,7 +5,16 @@
 #import "fishhook.h"
 #import "ZipHandler.h"
 
-#define VERSION "1.3"
+// HL_NAME / HL_VERSION / HL_AUTHOR are injected by the Makefile from `control`.
+#ifndef HL_NAME
+#define HL_NAME "HynisLoader"
+#endif
+#ifndef HL_VERSION
+#define HL_VERSION "?"
+#endif
+#ifndef HL_AUTHOR
+#define HL_AUTHOR "?"
+#endif
 
 static NSArray* getActiveResourcePacks(void);
 static NSString* findFileInPack(NSString* packId, NSString* subpack, NSString* relativePath);
@@ -182,37 +191,123 @@ static NSString* findFileInPack(NSString* packId, NSString* subpack, NSString* r
     return nil;
 }
 
-static void showDialog(NSString* title, NSString* message) {
-    UIAlertController *alert = [UIAlertController 
-        alertControllerWithTitle:title
-        message:message
-        preferredStyle:UIAlertControllerStyleAlert];
-    
-    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-    
-    UIWindow *gameWindow = nil;
+// Credit banner pinned to the top-left of Minecraft's window during the
+// initial loading screen, then auto-dismissed before extended play.
+//
+// The banner is its own UIWindow above the game's window so it survives
+// MCBE's view-hierarchy churn during launch. userInteractionEnabled = NO
+// makes touches fall through to the game window underneath.
+//
+// Dismissal is time-based (BANNER_VISIBLE_SECONDS) rather than a hook on
+// "loading complete" — fishhook can't see Mojang's internal lifecycle, and
+// vtable-based detection of engine takeover would be a much larger change
+// (see MCClient's known-limitations note on overlay scoping).
+#define BANNER_VISIBLE_SECONDS 20.0
+static UIWindow *gLoadingBanner = nil;
+
+static UIWindowScene *findActiveWindowScene(void) {
     for (UIScene *scene in [[UIApplication sharedApplication] connectedScenes]) {
-        if ([scene isKindOfClass:[UIWindowScene class]]) {
-            UIWindowScene *windowScene = (UIWindowScene *)scene;
-            for (UIWindow *window in windowScene.windows) {
-                if (window.isKeyWindow) {
-                    gameWindow = window;
-                    break;
-                }
-            }
-            if (!gameWindow) gameWindow = windowScene.windows.firstObject;
-            break;
+        if (![scene isKindOfClass:[UIWindowScene class]]) continue;
+        if (scene.activationState == UISceneActivationStateForegroundActive ||
+            scene.activationState == UISceneActivationStateForegroundInactive) {
+            return (UIWindowScene *)scene;
         }
     }
-    
-    if (!gameWindow) return;
-    
-    UIViewController *rootVC = gameWindow.rootViewController;
-    while (rootVC.presentedViewController) {
-        rootVC = rootVC.presentedViewController;
+    for (UIScene *scene in [[UIApplication sharedApplication] connectedScenes]) {
+        if ([scene isKindOfClass:[UIWindowScene class]]) return (UIWindowScene *)scene;
     }
-    
-    [rootVC presentViewController:alert animated:YES completion:nil];
+    return nil;
+}
+
+static void showLoadingBanner(void) {
+    UIWindowScene *scene = findActiveWindowScene();
+    if (!scene) return;
+
+    UIWindow *window = [[UIWindow alloc] initWithWindowScene:scene];
+    window.windowLevel = UIWindowLevelStatusBar + 100;
+    window.backgroundColor = [UIColor clearColor];
+    window.userInteractionEnabled = NO;
+
+    UIViewController *vc = [[UIViewController alloc] init];
+    vc.view.backgroundColor = [UIColor clearColor];
+    window.rootViewController = vc;
+
+    UIView *pill = [[UIView alloc] init];
+    pill.translatesAutoresizingMaskIntoConstraints = NO;
+    pill.backgroundColor = [UIColor colorWithRed:0.05 green:0.07 blue:0.10 alpha:0.78];
+    pill.layer.cornerRadius = 14.0;
+    pill.layer.borderWidth = 1.0;
+    pill.layer.borderColor = [UIColor colorWithRed:0.31 green:0.82 blue:0.77 alpha:0.55].CGColor;
+    pill.layer.shadowColor = [UIColor blackColor].CGColor;
+    pill.layer.shadowOpacity = 0.35;
+    pill.layer.shadowRadius = 8.0;
+    pill.layer.shadowOffset = CGSizeMake(0, 2);
+    [vc.view addSubview:pill];
+
+    UIFont *nameFont    = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
+    UIFont *versionFont = [UIFont systemFontOfSize:15.0 weight:UIFontWeightMedium];
+    UIFont *authorFont  = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
+
+    UIColor *nameColor    = [UIColor colorWithRed:0.31 green:0.82 blue:0.77 alpha:1.0]; // teal
+    UIColor *versionColor = [UIColor colorWithRed:0.96 green:0.88 blue:0.37 alpha:1.0]; // amber
+    UIColor *authorColor  = [UIColor colorWithRed:0.70 green:0.74 blue:0.85 alpha:1.0]; // lavender-gray
+
+    NSMutableAttributedString *att = [[NSMutableAttributedString alloc] init];
+    [att appendAttributedString:[[NSAttributedString alloc]
+        initWithString:@HL_NAME
+            attributes:@{NSFontAttributeName: nameFont,
+                         NSForegroundColorAttributeName: nameColor}]];
+    [att appendAttributedString:[[NSAttributedString alloc]
+        initWithString:@" v" HL_VERSION
+            attributes:@{NSFontAttributeName: versionFont,
+                         NSForegroundColorAttributeName: versionColor}]];
+    [att appendAttributedString:[[NSAttributedString alloc]
+        initWithString:@" by " HL_AUTHOR
+            attributes:@{NSFontAttributeName: authorFont,
+                         NSForegroundColorAttributeName: authorColor}]];
+
+    UILabel *label = [[UILabel alloc] init];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    label.textAlignment = NSTextAlignmentCenter;
+    label.numberOfLines = 1;
+    label.attributedText = att;
+    [pill addSubview:label];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [pill.leadingAnchor constraintEqualToAnchor:vc.view.safeAreaLayoutGuide.leadingAnchor constant:12.0],
+        [pill.topAnchor     constraintEqualToAnchor:vc.view.safeAreaLayoutGuide.topAnchor     constant:12.0],
+        [label.topAnchor      constraintEqualToAnchor:pill.topAnchor      constant:8.0],
+        [label.bottomAnchor   constraintEqualToAnchor:pill.bottomAnchor   constant:-8.0],
+        [label.leadingAnchor  constraintEqualToAnchor:pill.leadingAnchor  constant:18.0],
+        [label.trailingAnchor constraintEqualToAnchor:pill.trailingAnchor constant:-18.0],
+    ]];
+
+    pill.alpha = 0.0;
+    pill.transform = CGAffineTransformMakeTranslation(0, -8);
+
+    window.hidden = NO;
+    gLoadingBanner = window;
+
+    [UIView animateWithDuration:0.45
+                          delay:0.0
+         usingSpringWithDamping:0.85
+          initialSpringVelocity:0.0
+                        options:UIViewAnimationOptionCurveEaseOut
+                     animations:^{
+        pill.alpha = 1.0;
+        pill.transform = CGAffineTransformIdentity;
+    } completion:nil];
+
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(BANNER_VISIBLE_SECONDS * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        [UIView animateWithDuration:0.6 animations:^{
+            pill.alpha = 0.0;
+            pill.transform = CGAffineTransformMakeTranslation(0, -8);
+        } completion:^(BOOL finished) {
+            gLoadingBanner.hidden = YES;
+            gLoadingBanner = nil;
+        }];
+    });
 }
 
 %ctor {
@@ -228,8 +323,6 @@ static void showDialog(NSString* title, NSString* message) {
     }
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.0 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        NSString *title = @"HynisLoader";
-        NSString *desc = [NSString stringWithFormat:@"Version: %s\nDeveloper: congcq\nNote: shader must be activated in global resource to work", VERSION];
-        showDialog(title, desc);
+        showLoadingBanner();
     });
 }
