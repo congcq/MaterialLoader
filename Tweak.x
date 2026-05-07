@@ -32,7 +32,7 @@ FILE* hook_fopen(const char *path, const char *mode) {
                 
                 NSString *customFile = findFileInPack(nil, nil, relativePath);
                 if (customFile && [[NSFileManager defaultManager] fileExistsAtPath:customFile]) {
-                    NSLog(@"[HynisPatcher] ✅ Pack: %@", customFile);
+                    NSLog(@"[HynisLoader] ✅ Pack: %@", customFile);
                     return orig_fopen([customFile UTF8String], mode);
                 }
             }
@@ -114,14 +114,14 @@ static void buildPackRootCache(void) {
     }
     
     packRootCache = cache;
-    NSLog(@"[HynisPatcher] Cache built: %lu packs", (unsigned long)cache.count);
+    NSLog(@"[HynisLoader] Cache built: %lu packs", (unsigned long)cache.count);
 }
 
 static NSString* findPackRoot(NSString* packId) {
     NSString *cached = packRootCache[packId];
     
     if (!cached) {
-        NSLog(@"[HynisPatcher] Cache miss for %@, rebuilding...", packId);
+        NSLog(@"[HynisLoader] Cache miss for %@, rebuilding...", packId);
         buildPackRootCache();
         cached = packRootCache[packId];
     }
@@ -222,13 +222,13 @@ static void showDialog(NSString* title, NSString* message) {
     rebind_symbols(&fopen_rebinding, 1);
     
     if (orig_fopen) {
-        NSLog(@"[HynisPatcher] ✅ fopen hooked successfully");
+        NSLog(@"[HynisLoader] ✅ fopen hooked successfully");
     } else {
-        NSLog(@"[HynisPatcher] ❌ Failed to hook fopen");
+        NSLog(@"[HynisLoader] ❌ Failed to hook fopen");
     }
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.0 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-        NSString *title = @"Hynis Patcher";
+        NSString *title = @"HynisLoader";
         NSString *desc = [NSString stringWithFormat:@"Version: %s\nDeveloper: congcq\nNote: shader must be activated in global resource to work", VERSION];
         showDialog(title, desc);
     });
