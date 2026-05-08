@@ -1,0 +1,3 @@
+[submodule "HyniSign"]
+	path = HyniSign
+	url = https://github.com/vanhoof/HyniSign

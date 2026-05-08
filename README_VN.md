@@ -16,4 +16,6 @@ Tinh chỉnh này hook hàm `fopen()` khi Minecraft gọi hàm này từ `libsys
 
 ## Third party
 
+- [HyniSign](https://github.com/vanhoof/HyniSign): MIT License
+
 - [fishhook](https://github.com/jevinskie/fishhook): [BSD-3 License](https://github.com/facebook/fishhook/blob/main/LICENSE)

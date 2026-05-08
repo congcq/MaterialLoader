@@ -24,7 +24,7 @@ HL_NAME    := $(shell awk -F': *' '/^Name:/    {sub(/\r$$/,"",$$2); print $$2}' 
 HL_VERSION := $(shell awk -F': *' '/^Version:/ {sub(/\r$$/,"",$$2); print $$2}' control)
 HL_AUTHOR  := $(shell awk -F': *' '/^Author:/  {sub(/\r$$/,"",$$2); print $$2}' control)
 
-libhynisloader_FILES      = Tweak.x fishhook.c ZipHandler.m
+libhynisloader_FILES      = Tweak.x fishhook.c ZipHandler.m HyniSign/Tweak.x HyniSign/access_group.c
 libhynisloader_FRAMEWORKS = Foundation UIKit
 libhynisloader_CFLAGS     = -fobjc-arc \
     -DHL_NAME='"$(HL_NAME)"' \
