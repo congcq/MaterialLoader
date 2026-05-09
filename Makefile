@@ -2,7 +2,7 @@
 #
 # Builds a sideload-ready dylib at build/libhynisloader.dylib. Drag this into
 # Sideloadly's "Inject dylibs" list when re-signing the Minecraft IPA, or
-# install via TrollFools / .deb on a jailbroken device.
+# install via TrollFools on Jailed device (TrollStore installed) / .deb on a jailbroken device.
 #
 # Targets:
 #   make            Build sideload-ready dylib at build/libhynisloader.dylib
