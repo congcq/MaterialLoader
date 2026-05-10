@@ -1,0 +1,101 @@
+# CI for HynisLoader.
+#
+# Runs on every push/PR to main and on tags matching `v*`. Tag pushes
+# additionally publish a GitHub Release with the built dylib attached.
+#
+# ─── Cutting a release ──────────────────────────────────────────────
+#  1. Bump the Version field in `control` (e.g. 1.4b → 1.5):
+#       sed -i '' 's/^Version:.*/Version: 1.5/' control
+#     The Makefile re-reads `control` and bakes HL_VERSION into the
+#     banner via -D flags, so the on-screen pill stays in sync.
+#
+#  2. Verify locally:
+#       make clean && make
+#       bash tests/check-build.sh
+#     The `binary embeds version vX.Y from control` check is the
+#     canary for control/banner drift.
+#
+#  3. Commit, tag, push:
+#       git add control
+#       git commit -m "Bump version to 1.5"
+#       git tag v1.5
+#       git push origin main --follow-tags
+#
+#  4. The `release` job below picks up the `v*` tag, downloads the
+#     build artifact, and publishes a GitHub Release. No manual
+#     upload step required.
+# ────────────────────────────────────────────────────────────────────
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & test
+    runs-on: macos-latest
+    env:
+      THEOS: ${{ github.workspace }}/.theos-toolchain
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # HyniSign is a git submodule; the Makefile compiles its sources
+          # directly into libhynisloader.dylib, so we need it on disk.
+          submodules: recursive
+
+      - name: Install ldid
+        run: brew install ldid
+
+      - name: Install Theos
+        run: |
+          set -euo pipefail
+          git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS"
+          echo "$THEOS/bin" >> "$GITHUB_PATH"
+
+      - name: Build dylib
+        run: make
+
+      - name: Build smoke tests
+        run: bash tests/check-build.sh
+
+      - name: HyniSign unit tests
+        # access_group.c is compiled into libhynisloader.dylib via the
+        # submodule, so the HyniSign host-side unit tests cover behavior
+        # that ships in our binary too.
+        run: make -C HyniSign/tests test
+
+      - name: Upload dylib artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libhynisloader.dylib
+          path: build/libhynisloader.dylib
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download dylib artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libhynisloader.dylib
+          path: build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/libhynisloader.dylib
+          generate_release_notes: true
+          draft: false
+          prerelease: false
