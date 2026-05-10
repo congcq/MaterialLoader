@@ -2,6 +2,7 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 #import <stdatomic.h>
+#import <dlfcn.h>
 
 #import "fishhook.h"
 #import "ZipHandler.h"
@@ -448,17 +449,7 @@ static NSString* findFileInPack(NSString* packId, NSString* subpack, NSString* r
     return nil;
 }
 
-// Credit banner pinned to the top-left of Minecraft's window during the
-// initial loading screen, then auto-dismissed before extended play.
-//
-// The banner is its own UIWindow above the game's window so it survives
-// MCBE's view-hierarchy churn during launch. userInteractionEnabled = NO
-// makes touches fall through to the game window underneath.
-//
-// Dismissal is time-based (BANNER_VISIBLE_SECONDS) rather than a hook on
-// "loading complete" — fishhook can't see Mojang's internal lifecycle, and
-// vtable-based detection of engine takeover would be a much larger change
-// (see MCClient's known-limitations note on overlay scoping).
+// Bottom-centered credit banner shown for BANNER_VISIBLE_SECONDS after launch.
 #define BANNER_VISIBLE_SECONDS 20.0
 static UIWindow *gLoadingBanner = nil;
 static UIView *gLoadingBannerView = nil;
@@ -482,8 +473,8 @@ static void showLoadingBanner(void) {
     UIWindowScene *scene = findActiveWindowScene();
     if (!scene) return;
 
-    // Do NOT create a new UIWindow. Some games (including MCBE) can lose their
-    // "game-like" gesture behavior if any extra window exists above them.
+    // Reuse MCBE's existing window — a separate UIWindow above it breaks
+    // game-style gesture handling.
     UIWindow *gameWindow = nil;
     for (UIWindow *w in scene.windows) {
         if (w.isKeyWindow) { gameWindow = w; break; }
@@ -495,8 +486,9 @@ static void showLoadingBanner(void) {
     }
     if (!gameWindow) return;
 
-    UIView *hostView = gameWindow.rootViewController.view ?: gameWindow;
-    CALayer *hostLayer = hostView.layer;
+    // Attach to the window's CALayer, not the MTKView's CAMetalLayer.
+    UIView *hostView = gameWindow;
+    CALayer *hostLayer = gameWindow.layer;
 
     // Ensure we don't stack multiple banners.
     if (gLoadingBannerView) {
@@ -511,10 +503,18 @@ static void showLoadingBanner(void) {
     UIFont *nameFont    = [UIFont systemFontOfSize:16.0 weight:UIFontWeightSemibold];
     UIFont *versionFont = [UIFont systemFontOfSize:15.0 weight:UIFontWeightMedium];
     UIFont *authorFont  = [UIFont systemFontOfSize:14.0 weight:UIFontWeightRegular];
+    UIFont *fpsFont     = [UIFont systemFontOfSize:14.0 weight:UIFontWeightMedium];
 
     UIColor *nameColor    = [UIColor colorWithRed:0.31 green:0.82 blue:0.77 alpha:1.0]; // teal
     UIColor *versionColor = [UIColor colorWithRed:0.96 green:0.88 blue:0.37 alpha:1.0]; // amber
     UIColor *authorColor  = [UIColor colorWithRed:0.70 green:0.74 blue:0.85 alpha:1.0]; // lavender-gray
+    UIColor *fpsHighColor = [UIColor colorWithRed:0.40 green:0.85 blue:0.50 alpha:1.0]; // green = upgraded
+    UIColor *fpsLowColor  = authorColor;                                                // grey = default 60
+
+    // Effective FPS cap from HyniSwizzleFPS via dlsym; absent dylib → 60.
+    int fpsCap = 60;
+    int (*hsfps_effective_cap)(void) = dlsym(RTLD_DEFAULT, "HSFPS_EffectiveCap");
+    if (hsfps_effective_cap) fpsCap = hsfps_effective_cap();
 
     NSMutableAttributedString *att = [[NSMutableAttributedString alloc] init];
     [att appendAttributedString:[[NSAttributedString alloc]
@@ -529,13 +529,17 @@ static void showLoadingBanner(void) {
         initWithString:@" by " HL_AUTHOR
             attributes:@{NSFontAttributeName: authorFont,
                          NSForegroundColorAttributeName: authorColor}]];
+    [att appendAttributedString:[[NSAttributedString alloc]
+        initWithString:[NSString stringWithFormat:@" @ %dFPS", fpsCap]
+            attributes:@{NSFontAttributeName: fpsFont,
+                         NSForegroundColorAttributeName:
+                             (fpsCap > 60 ? fpsHighColor : fpsLowColor)}]];
 
-    // Size and place (top-left) using safe-area insets.
-    UIEdgeInsets insets = UIEdgeInsetsZero;
-    insets = gameWindow.safeAreaInsets;
+    // Bottom-centered just above the home-indicator graphic.
+    UIEdgeInsets insets = gameWindow.safeAreaInsets;
 
     const CGFloat outerPadX = 12.0;
-    const CGFloat outerPadY = 12.0;
+    const CGFloat bottomGap = 16.0;
     const CGFloat innerPadX = 18.0;
     const CGFloat innerPadY = 8.0;
     const CGFloat maxWidth = 460.0;
@@ -554,15 +558,15 @@ static void showLoadingBanner(void) {
     CGFloat pillW = MIN(pillMaxWidth, ceil(CGRectGetWidth(textRect)) + innerPadX * 2.0);
     CGFloat pillH = ceil(CGRectGetHeight(textRect)) + innerPadY * 2.0;
 
-    CGFloat pillX = insets.left + outerPadX;
-    CGFloat pillY = insets.top + outerPadY;
+    CGFloat pillX = (hostSize.width - pillW) / 2.0;
+    CGFloat pillY = hostSize.height - bottomGap - pillH;
     CGRect pillFrame = CGRectMake(pillX, pillY, pillW, pillH);
 
     CALayer *container = [CALayer layer];
     container.name = @"HLBannerContainer";
     container.frame = pillFrame;
     container.opacity = 0.0f;
-    container.transform = CATransform3DMakeTranslation(0, -8, 0);
+    container.transform = CATransform3DMakeTranslation(0, 8, 0);
     container.masksToBounds = NO;
 
     CALayer *bg = [CALayer layer];
@@ -607,7 +611,7 @@ static void showLoadingBanner(void) {
                    dispatch_get_main_queue(), ^{
         [UIView animateWithDuration:0.6 animations:^{
             container.opacity = 0.0f;
-            container.transform = CATransform3DMakeTranslation(0, -8, 0);
+            container.transform = CATransform3DMakeTranslation(0, 8, 0);
         } completion:^(BOOL finished) {
             gLoadingBannerView = nil;
             [gLoadingBannerLayer removeFromSuperlayer];
