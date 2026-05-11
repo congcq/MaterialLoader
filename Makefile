@@ -40,8 +40,8 @@ all::
 	@mkdir -p build
 	@cp .theos/obj/debug/libhynisloader.dylib build/libhynisloader.dylib
 	@install_name_tool -id "@executable_path/libhynisloader.dylib" build/libhynisloader.dylib 2>/dev/null
-	@codesign --remove-signature build/libhynisloader.dylib 2>/dev/null || true
-	@codesign -s - build/libhynisloader.dylib 2>/dev/null
+	#@codesign --remove-signature build/libhynisloader.dylib 2>/dev/null || true
+	#@codesign -s - build/libhynisloader.dylib 2>/dev/null
 	@echo "==> Sideload-ready dylib: build/libhynisloader.dylib"
 
 clean::
