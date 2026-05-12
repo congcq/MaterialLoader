@@ -12,6 +12,7 @@
 
 TARGET := iphone:clang:latest:14.0
 ARCHS  := arm64
+FOR_RELEASE := 1
 
 include $(THEOS)/makefiles/common.mk
 
@@ -38,10 +39,10 @@ include $(THEOS_MAKE_PATH)/tweak.mk
 # injecting into the IPA.
 all::
 	@mkdir -p build
-	@cp .theos/obj/debug/libhynisloader.dylib build/libhynisloader.dylib
+	@cp -R .theos/obj/libhynisloader.dylib build/libhynisloader.dylib
 	@install_name_tool -id "@executable_path/libhynisloader.dylib" build/libhynisloader.dylib 2>/dev/null
-	#@codesign --remove-signature build/libhynisloader.dylib 2>/dev/null || true
-	#@codesign -s - build/libhynisloader.dylib 2>/dev/null
+	@codesign --remove-signature build/libhynisloader.dylib 2>/dev/null || true
+	@codesign -s - build/libhynisloader.dylib 2>/dev/null
 	@echo "==> Sideload-ready dylib: build/libhynisloader.dylib"
 
 clean::

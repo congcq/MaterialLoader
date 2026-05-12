@@ -58,7 +58,8 @@ jobs:
           echo "$THEOS/bin" >> "$GITHUB_PATH"
 
       - name: Build dylib
-        run: make
+        run: |
+          make package && make package THEOS_PACKAGE_SCHEME=rootless
 
       - name: Build smoke tests
         run: bash tests/check-build.sh
@@ -72,8 +73,22 @@ jobs:
       - name: Upload dylib artifact
         uses: actions/upload-artifact@v4
         with:
-          name: libhynisloader.dylib
+          name: HynisLoader-Dylib
           path: build/libhynisloader.dylib
+          if-no-files-found: error
+
+      - name: Upload rootful tweak
+        uses: actions/upload-artifact@v4
+        with:
+          name: HynisLoader-Rootful
+          path: packages/com.congcq.hynisloader*iphoneos-arm.deb
+          if-no-files-found: error
+
+      - name: Upload rootless tweak
+        uses: actions/upload-artifact@v4
+        with:
+          name: HynisLoader-Rootless
+          path: packages/com.congcq.hynisloader*iphoneos-arm64.deb
           if-no-files-found: error
 
   release:
@@ -92,10 +107,17 @@ jobs:
           name: libhynisloader.dylib
           path: build
 
+      - name: Download tweak
+        uses: actions/download-artifact@v4
+        with:
+          path: packages/*.deb
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libhynisloader.dylib
+          files: |
+            build/libhynisloader.dylib
+            packages/*.deb
           generate_release_notes: true
           draft: false
           prerelease: false

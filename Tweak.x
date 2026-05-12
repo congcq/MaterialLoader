@@ -7,6 +7,12 @@
 #import "fishhook.h"
 #import "ZipHandler.h"
 
+#ifdef DEBUG
+#define HLog(...) NSLog(__VA_ARGS__)
+#else
+#define HLog(...)
+#endif
+
 // HL_NAME / HL_VERSION / HL_AUTHOR are injected by the Makefile from `control`.
 #ifndef HL_NAME
 #define HL_NAME "HynisLoader"
@@ -62,7 +68,7 @@ FILE* hook_fopen(const char *path, const char *mode) {
                 
                 NSString *customFile = findFileInPack(nil, nil, relativePath);
                 if (customFile && [[NSFileManager defaultManager] fileExistsAtPath:customFile]) {
-                    NSLog(@"[HynisLoader] ✅ Pack: %@", customFile);
+                    HLog(@"[HynisLoader] ✅ Pack: %@", customFile);
                     return orig_fopen([customFile UTF8String], mode);
                 }
             }
@@ -287,7 +293,7 @@ static void buildPackRootCache(void) {
         rendererPackIds = rendererIds;
         [gResolvedRendererPathCache removeAllObjects];
     }
-    NSLog(@"[HynisLoader] Cache built: %lu ids (%lu with renderer)",
+    HLog(@"[HynisLoader] Cache built: %lu ids (%lu with renderer)",
           (unsigned long)cache.count, (unsigned long)rendererIds.count);
 }
 
@@ -634,9 +640,9 @@ static void showLoadingBanner(void) {
     rebind_symbols(&fopen_rebinding, 1);
     
     if (orig_fopen) {
-        NSLog(@"[HynisLoader] ✅ fopen hooked successfully");
+        HLog(@"[HynisLoader] ✅ fopen hooked successfully");
     } else {
-        NSLog(@"[HynisLoader] ❌ Failed to hook fopen");
+        HLog(@"[HynisLoader] ❌ Failed to hook fopen");
     }
     
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.0 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
