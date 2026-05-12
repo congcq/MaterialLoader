@@ -1,6 +1,6 @@
 Package: com.congcq.hynisloader
 Name: HynisLoader
-Version: 1.4b
+Version: 1.4
 Architecture: iphoneos-arm
 Description: MCBE tweak
 Maintainer: congcq
