@@ -26,6 +26,7 @@
 
 static NSArray* getActiveResourcePacks(void);
 static NSString* findFileInPack(NSString* packId, NSString* subpack, NSString* relativePath);
+static void buildPackRootCache(void);
 
 // Cache snapshots (immutable) guarded by a concurrent queue.
 // - packRootCache: uuid -> packRootPath (directory or archive path)
@@ -130,6 +131,15 @@ static NSArray* getActiveResourcePacks(void) {
         gActivePacksMTime = mtime;
         gActivePacksSize = size;
         [gResolvedRendererPathCache removeAllObjects];
+    }
+
+    // Active pack selection changed; rebuild pack cache in the background so new packs are available quickly.
+    bool alreadyScheduled = atomic_exchange(&gPackCacheRebuildScheduled, true);
+    if (!alreadyScheduled) {
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            buildPackRootCache();
+            atomic_store(&gPackCacheRebuildScheduled, false);
+        });
     }
 
     return packs;
